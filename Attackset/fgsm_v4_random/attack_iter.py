@@ -82,7 +82,7 @@ FLAGS = tf.flags.FLAGS
 
 
 def load_images(input_dir, batch_shape):
-  """Read png images from input directory in batches.
+  """Read jpg images from input directory in batches.
 
   Args:
     input_dir: input directory
@@ -98,7 +98,7 @@ def load_images(input_dir, batch_shape):
   filenames = []
   idx = 0
   batch_size = batch_shape[0]
-  for filepath in tf.gfile.Glob(os.path.join(input_dir, '*.png')):
+  for filepath in tf.gfile.Glob(os.path.join(input_dir, '*.jpg')):
     with tf.gfile.Open(filepath) as f:
       image = imread(f, mode='RGB').astype(np.float) / 255.0
     # Images for inception classifier are normalized to be in [-1, 1] interval.
@@ -115,7 +115,7 @@ def load_images(input_dir, batch_shape):
 
 def save_images(arg):
     image,filename,output_dir = arg
-    imsave(os.path.join(output_dir, filename), (image + 1.0) * 0.5, format='png')
+    imsave(os.path.join(output_dir, str(filename, 'utf-8')), (image + 1.0) * 0.5)
 
 def graph(x, y, i, x_max, x_min, grad, eps_inside):
   num_iter = FLAGS.num_iter
@@ -170,9 +170,9 @@ def main(_):
   tf.logging.set_verbosity(tf.logging.INFO)
   pool = Pool()
   with tf.Graph().as_default(), tf.device('/cpu:0'):
-    flists = set([f for f in os.listdir(FLAGS.input_dir) if 'png' in f])
+    flists = set([f for f in os.listdir(FLAGS.input_dir) if 'jpg' in f])
     if FLAGS.use_existing == 1:
-        flists_existing = set([f for f in os.listdir(FLAGS.output_dir) if 'png' in f ])
+        flists_existing = set([f for f in os.listdir(FLAGS.output_dir) if 'jpg' in f ])
         newfiles = list(flists.difference(flists_existing))
         newfiles = [os.path.join(FLAGS.input_dir,f) for f in newfiles]
     else:
@@ -183,15 +183,16 @@ def main(_):
     filename_queue = tf.train.string_input_producer(newfiles, shuffle = False, num_epochs = FLAGS.batch_size)
     image_reader = tf.WholeFileReader()
     filename, image_file = image_reader.read(filename_queue)
-    image = tf.image.decode_png(image_file)
-    image.set_shape((299, 299, 3))
+    image = tf.image.decode_jpeg(image_file, channels=3)
+    image = tf.image.convert_image_dtype(image, dtype=tf.float32)
+    image_ = tf.image.resize_images(image, [299, 299])
 
     eps = tf.placeholder(dtype='float32', shape = [FLAGS.batch_size, None, None, None])
     # Generate batch
     num_preprocess_threads = 20
     min_queue_examples = 256
     images,filenames = tf.train.batch(
-        [image,filename],
+        [image_,filename],
         batch_size=FLAGS.batch_size,
         num_threads=num_preprocess_threads,
         capacity= 3 * FLAGS.batch_size,

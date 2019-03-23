@@ -82,7 +82,7 @@ FLAGS = tf.flags.FLAGS
 
 
 def load_images(input_dir, batch_shape):
-  """Read png images from input directory in batches.
+  """Read jpg images from input directory in batches.
 
   Args:
     input_dir: input directory

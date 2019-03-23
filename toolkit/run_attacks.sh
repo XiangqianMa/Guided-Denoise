@@ -19,6 +19,7 @@ MAX_EPSILON=16
 # be overwritten.
 WORKING_DIR="${parentdir}/Advset"
 echo "Running attacks and defenses"
+
 python "${SCRIPT_DIR}/run_attacks.py" \
   --attacks_dir="${ATTACKS_DIR}" \
   --targeted_attacks_dir="${WORKING_DIR}/targeted_attacks" \

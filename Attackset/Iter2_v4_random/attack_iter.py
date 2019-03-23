@@ -14,6 +14,8 @@ from nets import inception_v3, inception_v4, inception_resnet_v2, resnet_v2
 from functools import partial
 from multiprocessing import Pool
 import tensorflow as tf
+import matplotlib.pyplot as plt
+import cv2
 
 slim = tf.contrib.slim
 
@@ -34,7 +36,7 @@ tf.flags.DEFINE_string(
     'checkpoint_path_ens4_adv_inception_v3', '', 'Path to checkpoint for inception network.')
 
 tf.flags.DEFINE_string(
-    'checkpoint_path_inception_v4', '', 'Path to checkpoint for inception network.')
+    'checkpoint_path_inception_v4', '/home/mxq/Project/Adversial_Attack/Guided-Denoise/Attackset/Iter2_v4_random/checkpoints/inception_v4.ckpt', 'Path to checkpoint for inception network.')
 
 tf.flags.DEFINE_string(
     'checkpoint_path_inception_resnet_v2', '', 'Path to checkpoint for inception network.')
@@ -46,10 +48,10 @@ tf.flags.DEFINE_string(
     'checkpoint_path_resnet', '', 'Path to checkpoint for inception network.')
 
 tf.flags.DEFINE_string(
-    'input_dir', '', 'Input directory with images.')
+    'input_dir', '/home/mxq/Project/Adversial_Attack/Guided-Denoise/Originset', 'Input directory with images.')
 
 tf.flags.DEFINE_string(
-    'output_dir', '', 'Output directory with images.')
+    'output_dir', '/home/mxq/Project/Adversial_Attack/Guided-Denoise/Advset/attacks_output/Iter2_v4_random', 'Output directory with images.')
 
 tf.flags.DEFINE_float(
     'max_epsilon', 16.0, 'Maximum size of adversarial perturbation.')
@@ -64,7 +66,7 @@ tf.flags.DEFINE_integer(
     'image_height', 299, 'Height of each input images.')
 
 tf.flags.DEFINE_integer(
-    'batch_size', 10, 'How many images process at one time.')
+    'batch_size', 3, 'How many images process at one time.')
 
 tf.flags.DEFINE_integer(
     'use_existing', 0, 'whether reuse existing result')
@@ -82,7 +84,7 @@ FLAGS = tf.flags.FLAGS
 
 
 def load_images(input_dir, batch_shape):
-  """Read png images from input directory in batches.
+  """Read jpg images from input directory in batches.
 
   Args:
     input_dir: input directory
@@ -98,7 +100,7 @@ def load_images(input_dir, batch_shape):
   filenames = []
   idx = 0
   batch_size = batch_shape[0]
-  for filepath in tf.gfile.Glob(os.path.join(input_dir, '*.png')):
+  for filepath in tf.gfile.Glob(os.path.join(input_dir, '*.jpg')):
     with tf.gfile.Open(filepath) as f:
       image = imread(f, mode='RGB').astype(np.float) / 255.0
     # Images for inception classifier are normalized to be in [-1, 1] interval.
@@ -113,9 +115,13 @@ def load_images(input_dir, batch_shape):
   if idx > 0:
     yield filenames, images
 
+
 def save_images(arg):
     image,filename,output_dir = arg
-    imsave(os.path.join(output_dir, filename), (image + 1.0) * 0.5, format='png')
+    # print("-----{}, {}, {}---------".format(type(image), filename, output_dir))
+    # print(os.path.join(output_dir, str(filename, 'utf-8')))
+    # print(str(filename, 'utf-8'))
+    imsave(os.path.join(output_dir, str(filename, 'utf-8')), (image + 1.0) * 0.5)
 
 def graph(x, y, i, x_max, x_min, grad, eps_inside):
   num_iter = FLAGS.num_iter
@@ -170,9 +176,9 @@ def main(_):
   tf.logging.set_verbosity(tf.logging.INFO)
   pool = Pool()
   with tf.Graph().as_default(), tf.device('/cpu:0'):
-    flists = set([f for f in os.listdir(FLAGS.input_dir) if 'png' in f])
+    flists = set([f for f in os.listdir(FLAGS.input_dir) if '.jpg' in f])
     if FLAGS.use_existing == 1:
-        flists_existing = set([f for f in os.listdir(FLAGS.output_dir) if 'png' in f ])
+        flists_existing = set([f for f in os.listdir(FLAGS.output_dir) if '.jpg' in f ])
         newfiles = list(flists.difference(flists_existing))
         newfiles = [os.path.join(FLAGS.input_dir,f) for f in newfiles]
     else:
@@ -180,29 +186,27 @@ def main(_):
     print('creating %s new files'%(len(newfiles)))
     if len(newfiles) == 0:
         return
+    
     filename_queue = tf.train.string_input_producer(newfiles, shuffle = False, num_epochs = FLAGS.batch_size)
     image_reader = tf.WholeFileReader()
     filename, image_file = image_reader.read(filename_queue)
-    image = tf.image.decode_png(image_file)
-    image.set_shape((299, 299, 3))
+    image = tf.image.decode_jpeg(image_file, channels=3)
+    # image.set_shape((299, 299, 3))
+    image = tf.image.convert_image_dtype(image, dtype=tf.float32)
+    image_ = tf.image.resize_images(image, [299, 299])
 
     eps = tf.placeholder(dtype='float32', shape = [FLAGS.batch_size, None, None, None])
+
     # Generate batch
     num_preprocess_threads = 20
     min_queue_examples = 256
-    images,filenames = tf.train.batch(
-        [image,filename],
-        batch_size=FLAGS.batch_size,
-        num_threads=num_preprocess_threads,
-        capacity= 3 * FLAGS.batch_size,
-        allow_smaller_final_batch = False)
+    images, filenames = tf.train.batch([image_, filename], batch_size=FLAGS.batch_size, num_threads=num_preprocess_threads, capacity=3*FLAGS.batch_size+100)
     images = tf.cast(images,tf.float32)/255.0*2.-1.
     images_splits = tf.split(axis=0, num_or_size_splits=n_gpus, value=images)
     eps_splits = tf.split(axis=0, num_or_size_splits=n_gpus, value=eps)
  
-
     # Prepare graph
-    #x_input = tf.placeholder(tf.float32, shape=batch_shape)
+    # x_input = tf.placeholder(tf.float32, shape=batch_shape)
     x_advlist = []
     for i_gpu in range(n_gpus):
         start = i_gpu*bs_single
@@ -222,17 +226,20 @@ def main(_):
             x_adv, _, _, _, _, _, _ = tf.while_loop(stop, graph, [x_in_single, y, i, x_max, x_min, grad, eps_single])
             x_advlist.append(x_adv)
     x_adv = tf.concat(x_advlist,0)
+
     # Run computation
     s5 = tf.train.Saver(slim.get_model_variables(scope='InceptionV4'))
- 
-    init = (tf.global_variables_initializer(), tf.local_variables_initializer())  
+    init = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())  
 
     with tf.Session() as sess:
       sess.run(init)
+      
       s5.restore(sess, FLAGS.checkpoint_path_inception_v4)
       coord = tf.train.Coordinator()
-      threads = tf.train.start_queue_runners(coord=coord)
+      threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
       n_iter = -(-(len(newfiles))//FLAGS.batch_size)
+      
       stack_img = []
       stack_names = []
       for i in range(n_iter):
@@ -241,7 +248,13 @@ def main(_):
           else:
             eps_value = np.ones([FLAGS.batch_size,1,1,1]) * FLAGS.max_epsilon
           eps_value = eps_value.astype('float32') *2 /255
-          names,adv_images,orig_images = sess.run([filenames,x_adv,images], feed_dict={eps:eps_value})
+          
+          names, adv_images, orig_images = sess.run([filenames,x_adv,images], feed_dict={eps:eps_value})
+          
+          # print(type(adv_images))
+          # cv2.imshow("win", (adv_images[0]+1)/2*255)
+          # cv2.waitKey(0)
+
           names = [os.path.basename(name) for name in names]
           stack_img.append(adv_images)
           stack_names.append(names)
@@ -251,14 +264,14 @@ def main(_):
             print("%d / %d"%(i+1,n_iter)) 
             stack_img = np.concatenate(stack_img)
             stack_names = np.concatenate(stack_names)
-            #partial_save = partial(save_one,images=stack_img,filenames=stack_names,output_dir=FLAGS.output_dir)
-            paras = ((im,name,FLAGS.output_dir) for (im,name) in zip(stack_img,stack_names))
-            pool.map_async(save_images,paras)
+            # partial_save = partial(save_one,images=stack_img,filenames=stack_names,output_dir=FLAGS.output_dir)
+            paras = ((im, name, FLAGS.output_dir) for (im,name) in zip(stack_img,stack_names))
+            pool.map_async(save_images, paras)
             stack_img = []
             stack_names = []
 
-
-  #    save_images(adv_images, filenames, FLAGS.output_dir)
+      # img_save = (adv_images[0]+1)/2*255
+      # save_images(img_save, str(names[0]), FLAGS.output_dir)
       # Finish off the filename queue coordinator.
       coord.request_stop()
       coord.join(threads)

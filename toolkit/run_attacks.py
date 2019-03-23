@@ -17,21 +17,21 @@ def parse_args():
   """Parses command line arguments."""
   parser = argparse.ArgumentParser(
       description='Tool to run attacks and defenses.')
-  parser.add_argument('--attacks_dir', required=True,
+  parser.add_argument('--attacks_dir', required=False,type=str,default="/home/mxq/Project/Adversial_Attack/Guided-Denoise/Attackset",
                       help='Location of all attacks.')
-  parser.add_argument('--targeted_attacks_dir', required=True,
+  parser.add_argument('--targeted_attacks_dir', required=False,type=str,default="/home/mxq/Project/Adversial_Attack/Guided-Denoise/Advset/targeted_attacks",
                       help='Location of all targeted attacks.')
-  parser.add_argument('--defenses_dir', required=True,
+  parser.add_argument('--defenses_dir', required=False,type=str,default="/home/mxq/Project/Adversial_Attack/Guided-Denoise/Advset/defenses",
                       help='Location of all defenses.')
-  parser.add_argument('--dataset_dir', required=True,
+  parser.add_argument('--dataset_dir', required=False,type=str,default="/home/mxq/Project/Adversial_Attack/Guided-Denoise/Originset",
                       help='Location of the dataset.')
-  parser.add_argument('--dataset_metadata', required=True,
+  parser.add_argument('--dataset_metadata', required=False,type=str,default="/home/mxq/Project/Adversial_Attack/Guided-Denoise/dev_dataset.csv",
                       help='Location of the dataset metadata.')
-  parser.add_argument('--intermediate_results_dir', required=True,
+  parser.add_argument('--intermediate_results_dir', required=False,type=str,default="/home/mxq/Project/Adversial_Attack/Guided-Denoise/Advset",
                       help='Directory to store intermediate results.')
-  parser.add_argument('--output_dir', required=True,
+  parser.add_argument('--output_dir', required=False,type=str,default="/home/mxq/Project/Adversial_Attack/Guided-Denoise/Advset/output_dir",
                       help=('Output directory.'))
-  parser.add_argument('--batch_size', required=False,type=int,default=10,
+  parser.add_argument('--batch_size', required=False,type=int,default=5,
                       help=('batch size.'))
 
 
@@ -39,11 +39,11 @@ def parse_args():
                       help='Maximum allowed size of adversarial perturbation')
   parser.add_argument('--gpu', dest='use_gpu', action='store_true')
   parser.add_argument('--nogpu', dest='use_gpu', action='store_false')
-  parser.set_defaults(use_gpu=False)
+  parser.set_defaults(use_gpu=True)
   parser.add_argument('--gpuid', default=0, type=str)
   parser.add_argument('--use_docker',action='store_true')
   parser.add_argument('--use_existing', type=str, default='0')
-  parser.add_argument('--models', default='all', type=str)
+  parser.add_argument('--models', default='Iter2_v4_random', type=str)
   parser.add_argument('--save_all_classification',
                       dest='save_all_classification', action='store_true')
   parser.add_argument('--nosave_all_classification',
@@ -396,7 +396,7 @@ def main():
                                       'all_adv_examples')
 
   # Load dataset metadata.
-  dataset_meta = DatasetMetadata(args.dataset_metadata)
+  # dataset_meta = DatasetMetadata(args.dataset_metadata)
 
   # Load attacks and defenses.
   attacks = [
