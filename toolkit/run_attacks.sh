@@ -34,5 +34,3 @@ python "${SCRIPT_DIR}/run_attacks.py" \
   --gpu \
   --use_existing 0 \
   --gpuid="${GPUID}" \
-
-

@@ -43,7 +43,7 @@ The program will load Exp/sample/model.py as a model to train. and also you can 
 
 # 修改
 
-在运行attack_iter.py脚本时会报错，需要修改以下几处：
+## 在运行attack_iter.py脚本时会报错，需要修改以下几处：
 
 1. 注意加载的图片的格式，原始的图片格式为.png，需要将其修改为.jpg．同时修改tf的图片加载函数:
 ```
@@ -53,22 +53,19 @@ The program will load Exp/sample/model.py as a model to train. and also you can 
 ```
 
 2. 原始脚本中使用的``image.set_shape((299, 299, 3))``不起作用，将其替换为以下几句：
-
 ```
-image = tf.image.convert_image_dtype(image, dtype=tf.float32)
-image_ = tf.image.resize_images(image, [299, 299])
+  image = tf.image.convert_image_dtype(image, dtype=tf.float32)
+  image_ = tf.image.resize_images(image, [299, 299])
 ```
 
 3. 将图片保存函数修改为以下格式：
-
 ```
-def save_images(arg):
-    image,filename,output_dir = arg
-    imsave(os.path.join(output_dir, str(filename, 'utf-8')), (image + 1.0) * 0.5)
+  def save_images(arg):
+      image,filename,output_dir = arg
+      imsave(os.path.join(output_dir, str(filename, 'utf-8')), (image + 1.0) * 0.5)
 ```
 
 4. 类别数目
-
 将
 ```
 def graph(x, y, i, x_max, x_min, grad, eps_inside):
@@ -78,3 +75,7 @@ def graph(x, y, i, x_max, x_min, grad, eps_inside):
   num_classes = 1001
 ```
 修改为自己的类别总数．
+
+## prepare_data的修改
+
+`target_class = np.random.randint(1000)`中的`1000`修改为自己的训练集的类别数
