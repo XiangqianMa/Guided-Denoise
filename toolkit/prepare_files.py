@@ -3,7 +3,8 @@ import os
 import pandas
 
 data_train_class_flag = False
-val_txt_flag = True
+val_txt_flag = False
+calculate_class_number = True
 
 if data_train_class_flag:
     # 准备dataset_train_class.npy文件，该文件中存放用于训练的类别名
@@ -32,5 +33,28 @@ if val_txt_flag:
         for file_name, true_label in zip(file_names, true_labels):
             print(file_name, true_label)
             txt_file.writelines(file_name + ' ' + str(true_label) + '\n')
+
+if calculate_class_number:
+    imagenet_path = '/media/mxq/数据/DataSets/Tianchi/IJCAI_2019_AAAC_train'
+    class_folders = os.listdir(imagenet_path)
+
+    class_num = len(class_folders)
+    print("----There are {} classes.----".format(class_num))
+    
+    # 挑出包含样本数目最少的类别
+    class_number_min = 100000
+    class_name_min = " "
+    for class_folder in class_folders:
+        image_files = os.listdir(os.path.join(imagenet_path, class_folder))
+        image_num = len(image_files)
+        print("----Class {} has {} images.----".format(class_folder, image_num))
+
+        if(image_num < class_number_min):
+            class_number_min = image_num
+            class_nam_min = class_folder
+        else:
+            continue
+    
+    print("---Class {} has min images num: {}".format(class_name_min, class_number_min))
 
 

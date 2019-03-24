@@ -9,7 +9,9 @@ from scipy.misc import imresize,imsave
 from multiprocessing import Pool
 from functools import partial
 import cv2
-# get_ipython().run_line_magic('matplotlib', 'inline')
+
+
+class_num = 110
 
 
 def resize_all(id,namelist,path2):
@@ -31,14 +33,14 @@ def resize_all(id,namelist,path2):
 # 
 # the training and validation sets are extracted from the training set of the imagenet
 
-
+# 原始数据集的存放路径，该路径下每一个子文件夹分别代表一类
 imagenet_path = '/media/mxq/数据/DataSets/Tianchi/IJCAI_2019_AAAC_train'
 path2 = './Originset/'
 n_per_class = 4 # train
 n_per_class_test = [10,40] # test
 
 # 在imagenet_path的目录下，每一个文件夹代表一类样本
-n_train = int(n_per_class*0.75 ) # 从用于训练的类别中抽取用于训练的类别，剩余的用于验证集
+n_train = int(n_per_class*0.75 ) # 从用于训练的类别中抽取用于训练的样本数目，剩余的用于验证集
 subdirs = os.listdir(imagenet_path)
 subdirs = np.sort(subdirs)
 label_mapping={}
@@ -56,9 +58,9 @@ class2 = np.load('utils/dataset_train_class.npy')
 class1 = [label_mapping[name] for name in class1]
 class2 = [label_mapping[name] for name in class2]
 
-
+# n_repeat表示从每一类中抽取的样本数目，乘以类别总数表示训练集中的样本总数，12表示.csv文件中总共有多少列
 n_repeat = n_per_class
-info_list = np.zeros([n_repeat*1000,12]).astype('str')
+info_list = np.zeros([n_repeat*class_num, 12]).astype('str')
 trainset_d1 = np.array([])
 valset_d1 = np.array([])
 trainset_d2 = np.array([])
@@ -70,7 +72,7 @@ i_cum =0
 for i_dir,dir in enumerate(subdirs):
     fullpath = os.path.join(imagenet_path,dir)
     filelist = os.listdir(fullpath)
-    # 从filelist中随机选择n_repeat个样本
+    # 从filelist（每一类）中随机选择n_repeat个样本
     randid = np.random.permutation(len(filelist))[:n_repeat]
     chosen_im = np.array(filelist)[randid]
     rename_im = np.array([n.split('.')[0]+'jpg' for n in chosen_im])
@@ -91,7 +93,7 @@ for i_dir,dir in enumerate(subdirs):
     for i in range(n_repeat):
         target_class = labels
         while target_class==labels:
-            target_class = np.random.randint(1000)
+            target_class = np.random.randint(class_num)
 #         info_list[i].append([chosen_im[i].split('.')[0],0,0,0,1,1,labels,target_class,0,0,0,0])
         info_list[i_cum] = np.array([chosen_im[i].split('.')[0],0,0,0,1,1,labels,target_class,0,0,0,0])
         
@@ -106,15 +108,16 @@ resize_partial = partial(resize_all,namelist=namelist,path2=path2)
 _ = pool.map(resize_partial,range(len(namelist)))
 
 
+# 用于产生对抗样本的训练集
 np.save('./utils/dataset1_train_split.npy',trainset_d1)
 np.save('./utils/dataset1_val_split.npy',valset_d1)
+
+# 用于验证HGD迁移行的训练集
 np.save('./utils/dataset2_train_split.npy',trainset_d2)
 np.save('./utils/dataset2_val_split.npy',valset_d2)
 
 
-# 生成测试集
-# 测试集来自于imagenet的验证集
-
+# ---------------------------------------------------生成测试集-----------------------------------------------
 
 imagenet_path = '/media/mxq/数据/DataSets/Tianchi/dev_data'
 path2 = './Originset_test/'
@@ -142,7 +145,7 @@ for key in label_val:
 
     target_class = labels
     while target_class == labels:
-        target_class = np.random.randint(110)
+        target_class = np.random.randint(class_num)
     info_list[i_cum, :] = np.array([key, 0, 0, 0, 1, 1, labels, target_class, 0, 0, 0, 0])
 
     # namelist = np.append(namelist, np.array(fullimpath), axis=0)

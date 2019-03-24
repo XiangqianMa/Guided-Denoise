@@ -10,3 +10,6 @@ GD_train/test_results
 PD_train/results
 PD_train/test_results
 Attackset/*/.git
+*.pth
+Advset/*
+*.csv
