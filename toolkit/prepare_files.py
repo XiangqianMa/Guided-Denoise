@@ -51,7 +51,7 @@ if calculate_class_number:
 
         if(image_num < class_number_min):
             class_number_min = image_num
-            class_nam_min = class_folder
+            class_name_min = class_folder
         else:
             continue
     

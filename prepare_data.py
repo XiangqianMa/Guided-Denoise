@@ -12,7 +12,7 @@ import cv2
 
 
 class_num = 110
-
+train_ratio = 0.99
 
 def resize_all(id,namelist,path2):
     im = cv2.imread(namelist[id])
@@ -35,7 +35,9 @@ def resize_all(id,namelist,path2):
 
 # 原始数据集的存放路径，该路径下每一个子文件夹分别代表一类
 imagenet_path = '/media/mxq/数据/DataSets/Tianchi/IJCAI_2019_AAAC_train'
+# 提取出的数据的存放路径
 path2 = './Originset/'
+# 每一类抽取的类别数目
 n_per_class = 4 # train
 n_per_class_test = [10,40] # test
 
@@ -60,44 +62,51 @@ class2 = [label_mapping[name] for name in class2]
 
 # n_repeat表示从每一类中抽取的样本数目，乘以类别总数表示训练集中的样本总数，12表示.csv文件中总共有多少列
 n_repeat = n_per_class
-info_list = np.zeros([n_repeat*class_num, 12]).astype('str')
+# info_list = np.zeros([n_repeat*class_num, 12]).astype('str')
+info_list = np.zeros([1, 12])
 trainset_d1 = np.array([])
 valset_d1 = np.array([])
 trainset_d2 = np.array([])
 valset_d2 = np.array([])
 namelist = np.array([])
 
-i_cum =0
-
-for i_dir,dir in enumerate(subdirs):
+for i_dir, dir in enumerate(subdirs):
     fullpath = os.path.join(imagenet_path,dir)
     filelist = os.listdir(fullpath)
-    # 从filelist（每一类）中随机选择n_repeat个样本
-    randid = np.random.permutation(len(filelist))[:n_repeat]
+    image_num = len(filelist)
+    train_num = int(image_num * train_ratio)
+
+    print("Class {} has {} images, in which {} images are chosen as train_sets, {} are chosen as val_sets."
+            .format(dir, image_num, train_num, image_num-train_num))
+
+    # 抽取所有的样本
+    randid = np.random.permutation(len(filelist))
     chosen_im = np.array(filelist)[randid]
     rename_im = np.array([n.split('.')[0]+'jpg' for n in chosen_im])
-    # 从抽取的n_repeat个样本中抽取n_train个用于训练，剩余的用于验证
-    trainset_d1 = np.concatenate([trainset_d1,rename_im[:n_train]])
-    valset_d1 = np.concatenate([valset_d1,rename_im[n_train:]])
+    # 从抽取的样本中抽取train_num个用于训练，剩余的用于验证
+    trainset_d1 = np.concatenate([trainset_d1,rename_im[:train_num]])
+    valset_d1 = np.concatenate([valset_d1,rename_im[train_num:]])
     
     # 被选中的样本的绝对路径
     fullimpath = [os.path.join(fullpath,f) for f in chosen_im]
-    namelist = np.concatenate([namelist,fullimpath])
+    namelist = np.concatenate([namelist, fullimpath])
 
     labels = label_mapping[dir]
     if labels in class1:
-        trainset_d2 = np.concatenate([trainset_d2,rename_im])
-        valset_d2 = np.concatenate([valset_d2,rename_im])
+        trainset_d2 = np.concatenate([trainset_d2,rename_im[:train_num]])
+        valset_d2 = np.concatenate([valset_d2,rename_im[train_num:]])
     
-    # 
-    for i in range(n_repeat):
+    for i in range(image_num):
         target_class = labels
         while target_class==labels:
             target_class = np.random.randint(class_num)
-#         info_list[i].append([chosen_im[i].split('.')[0],0,0,0,1,1,labels,target_class,0,0,0,0])
-        info_list[i_cum] = np.array([chosen_im[i].split('.')[0],0,0,0,1,1,labels,target_class,0,0,0,0])
-        
-        i_cum += 1
+
+        new_column = np.array([[chosen_im[i].split('.')[0], 0, 0, 0, 1, 1, labels, target_class, 0, 0, 0, 0]])
+        if i == 0 and i_dir == 0:
+            info_list = new_column
+        else:
+            info_list = np.concatenate((info_list, new_column), axis=0)
+
 newpd = pandas.DataFrame(info_list)
 newpd.columns = example.columns
 newpd.to_csv('dev_dataset.csv', index=False)
@@ -191,4 +200,3 @@ np.save('utils/dataset2_test_split.npy',allnames)
 
 resize_partial = partial(resize_all,namelist=namelist,path2=path2)
 _ = pool.map(resize_partial,range(len(namelist)))
-
